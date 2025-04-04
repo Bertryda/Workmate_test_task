@@ -69,7 +69,7 @@ async def parse_log_file(file_path: str) -> Dict[str, Dict[str, int]]:
         if handler and handler not in data:
             data[handler] = {}
         if level in LOG_LEVELS and handler:
-            stats[handler][level] += 1
+            data[handler][level] += 1
             
     return data
 
@@ -119,13 +119,60 @@ def merge_data(
 
 
 def format_out(handler: str, levels: Dict[str, int]) -> str:
+    """
+    Функция ворматирует строку вывода инфо для одного handler,
+    создано для использования в функции report_out
+
+    Args:
+        handler (str): сам handler вывода
+        levels (Dict[str, int]): инфо по каждому уровню логирования
+
+    Returns:
+        str: возвращает результирующую строку
+    """
     handler_out = handler[:25].ljust(25)
     levels_out = [str(levels.get(level, 0)).ljust(8) for level in LOG_LEVELS]
     return handler_out + "\t\t".join(levels_out)
 
 
+def report_out(final_result: Dict[str, Dict[str, int]]) -> str:
+    """
+    Функция генерации отчета о handlers на основании вайлов логов
 
+    Args:
+        final_result (Dict[str, Dict[str, int]]): итоговое инфо полученное
+        из файлов логов
 
+    Returns:
+        str: возвращает строку вывода
+    """
+    handler_sorted = sorted(final_result.keys())
+    header = "HANDLER".ljust(25) + "\t\t".join(level.ljust(8) for level in LOG_LEVELS)
+    lines = [header]
+    
+    all_requests = 0
+    request_by_level = {level: 0 for level in LOG_LEVELS}
+    
+    for handler in handler_sorted:
+        levels = final_result[handler]
+        lines.append(format_out(handler, levels))
+        
+        for level in LOG_LEVELS:
+            k = levels.get(level, 0)
+            request_by_level[level] += k
+            all_requests += k
+            
+    all_req_line = "TOTAL".ljust(25) + "\t\t".join(
+        str(request_by_level[level]).ljust(8) for level in LOG_LEVELS
+    )
+    lines.append(all_req_line)
+    
+    return "\n".join([
+        f"Total requests: {all_requests}",
+        "",
+        *lines
+    ])
+    
 
 
     
