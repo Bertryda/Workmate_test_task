@@ -5,7 +5,7 @@ import asyncio
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, AsyncIterable
 
-from .config import LOG_PATTERN
+from .config import LOG_PATTERN, LOG_LEVELS
 
 
 async def read_file_lines(file_path: str) -> AsyncIterable[str]:
@@ -89,6 +89,41 @@ async def parse_log_files(
     """
     result = [parse_log_file(file_path) for file_path in file_path_list]
     return await asyncio.gather(*result)
+
+
+def merge_data(
+    data_list: List[Dict[str, Dict[str, int]]]
+) -> Dict[str, Dict[str, int]]:
+    """
+    Функция, созданная для работы с parse_log_files для получения 
+    общей статистики по файлам логов
+
+    Args:
+        data_list (List[Dict[str, Dict[str, int]]]): Общие данные из
+        файлов логов
+
+    Returns:
+        Dict[str, Dict[str, int]]: Возвращает итоговый словарь с 
+        информацией о логах
+    """
+    final_result = {}
+    
+    for data in data_list:
+        for handler, levels in data.items():
+            if handler not in final_result:
+                final_result[handler] = {}
+            for level, count in levels.items():
+                final_result[handler][level] += count
+                
+    return final_result
+
+
+def format_out(handler: str, levels: Dict[str, int]) -> str:
+    handler_out = handler[:25].ljust(25)
+    levels_out = [str(levels.get(level, 0)).ljust(8) for level in LOG_LEVELS]
+    return handler_out + "\t\t".join(levels_out)
+
+
 
 
 
