@@ -173,6 +173,14 @@ def report_out(final_result: Dict[str, Dict[str, int]]) -> str:
         *lines
     ])
     
+    
+def validate_files(file_paths: List[str]) -> None:
+    """Проводит валидацию файлов"""
+    for file_path in file_paths:
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"file {file_path} not found")    
+    
+    
 
 
     
