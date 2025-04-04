@@ -178,9 +178,54 @@ def validate_files(file_paths: List[str]) -> None:
     """Проводит валидацию файлов"""
     for file_path in file_paths:
         if not os.path.isfile(file_path):
-            raise FileNotFoundError(f"file {file_path} not found")    
+            raise FileNotFoundError(f"file {file_path} not found") 
+        
+        
+async def async_main():
+    parser = argparse.ArgumentParser(
+        description="Processing django log files and creating a report."
+    )   
+    parser.add_argument(
+        "log_files",
+        nargs="+",
+        help="Specify the paths to the log files"
+    )
+    parser.add_argument(
+        "--report",
+        choices=["handlers"],
+        required=True,
+        help="Name of the report"
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        validate_files(args.log_files)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return 
+    
+    if len(args.log_files) == 1:
+        data_list_result = await parse_log_file
+    else:
+        data_list = await parse_log_files
+        data_list_result = merge_data(data_list)
+        
+    if args.report == "handlers":
+        report = report_out(data_list_result)
+        print(report)
+        
+        
+def main():
+    asyncio.run(async_main())
+    
+
+if __name__ == "__main__":
+    main()
     
     
+
+
 
 
     
