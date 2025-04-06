@@ -1,9 +1,8 @@
 import argparse
 import asyncio
 import os
-import re
+from re import Match, search
 from typing import Dict, List, Tuple, Optional, AsyncIterable
-
 
 
 class LogParser:
@@ -13,7 +12,7 @@ class LogParser:
         self.handler_pattern = handler_pattern
         self.log_levels = log_levels
 
-    def parse_log_line(self, line: str) -> Tuple[Optional[str], Optional[str]]:
+    def parse_log_line(self, line: str) -> Tuple[str, Optional[str]]:
         """
         Функция для преобразования строки в кортеж, 
         где первый элемент: уровень логирования,
@@ -28,14 +27,12 @@ class LogParser:
             указанными выше значениями, Optional необходим для 
             дальнейшей проверки
         """
-        level = re.search(self.log_pattern, line)
-        handler = re.search(self.handler_pattern, line)
-
+        level = search(self.log_pattern, line).group()
+        handler = search(self.handler_pattern, line)
         if handler:
-            level = level.group() if level else None
             handler = handler.group()
             return level, handler
-        return (level.group() if level else None), None
+        return level, None
 
 
 class AsyncLogFileReader:
