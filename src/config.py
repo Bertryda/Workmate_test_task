@@ -1,10 +1,7 @@
 import re
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+LOG_PATTERN = r"(DEBUG)|(INFO)|(WARNING)|(ERROR)|(CRITICAL)"
+HANDLER_PATTERN = r"/.+/"
 
-LOG_PATTERN = re.compile(
-    r"^\[(?P<timestamp>.+?)\] "
-    r"\[(?P<level>.+?)\] "
-    r"\[django\.requests\] "
-    r"\[(?P<handler>.+?)\]"
-)
+

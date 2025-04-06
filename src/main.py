@@ -1,14 +1,11 @@
 import argparse
 import os
 import re
-import asyncio
-from collections import defaultdict
-from typing import Dict, List, Tuple, Optional, AsyncIterable
+from typing import Dict, List, Tuple, Optional, Iterable
 
-from .config import LOG_PATTERN, LOG_LEVELS
+from config import LOG_PATTERN, LOG_LEVELS, HANDLER_PATTERN
 
-
-async def read_file_lines(file_path: str) -> AsyncIterable[str]:
+def read_file_lines(file_path: str) -> Iterable[str]:
     """
     Функция асинхронно и и построчно читает файл, доступ 
     к которому происходит через file_path
@@ -40,17 +37,18 @@ def parse_log_line(line: str) -> Tuple[Optional[str], Optional[str]]:
         указанными выше значениями, Optional необходим для 
         дальнейшей проверки
     """
-    
-    cache = LOG_PATTERN.match(line.strip())
-    
-    if cache:
-        level = cache.group("level").upper()
-        handler = cache.group("handler")
+    # print(line)
+    level = re.search(LOG_PATTERN, line)
+    handler = re.search(HANDLER_PATTERN, line)
+
+    if handler:
+        level = level.group()
+        handler = handler.group()
         return level, handler
-    return None, None
+    return level.group(), None
 
 
-async def parse_log_file(file_path: str) -> Dict[str, Dict[str, int]]:
+def parse_log_file(file_path: str) -> Dict[str, Dict[str, int]]:
     """
     Функция асинхронно обрабатывает файл логов и возвращает
     полученную статистику
@@ -64,17 +62,21 @@ async def parse_log_file(file_path: str) -> Dict[str, Dict[str, int]]:
     """
     data = {}
 
-    async for line in read_file_lines(file_path):
+    for line in read_file_lines(file_path):
         level, handler = parse_log_line(line)
         if handler and handler not in data:
-            data[handler] = {}
-        if level in LOG_LEVELS and handler:
+            data[handler] = {level_info: 0 for level_info in LOG_LEVELS}
+            cache = handler
+        if handler:
             data[handler][level] += 1
+            cache = handler
+        if not handler:
+            data[cache][level] += 1
             
     return data
 
 
-async def parse_log_files(
+def parse_log_files(
         file_path_list: List[str],
     ) -> List[Dict[str, Dict[str, int]]]:
     """
@@ -88,7 +90,7 @@ async def parse_log_files(
         parse_log_file но несколько значений
     """
     result = [parse_log_file(file_path) for file_path in file_path_list]
-    return await asyncio.gather(*result)
+    return result
 
 
 def merge_data(
@@ -111,16 +113,15 @@ def merge_data(
     for data in data_list:
         for handler, levels in data.items():
             if handler not in final_result:
-                final_result[handler] = {}
+                final_result[handler] = {level_info: 0 for level_info in LOG_LEVELS}
             for level, count in levels.items():
                 final_result[handler][level] += count
-                
     return final_result
 
 
 def format_out(handler: str, levels: Dict[str, int]) -> str:
     """
-    Функция ворматирует строку вывода инфо для одного handler,
+    Функция Форматирует строку вывода инфо для одного handler,
     создано для использования в функции report_out
 
     Args:
@@ -131,8 +132,8 @@ def format_out(handler: str, levels: Dict[str, int]) -> str:
         str: возвращает результирующую строку
     """
     handler_out = handler[:25].ljust(25)
-    levels_out = [str(levels.get(level, 0)).ljust(8) for level in LOG_LEVELS]
-    return handler_out + "\t\t".join(levels_out)
+    levels_out = [str(levels[level]).ljust(8) for level in LOG_LEVELS]
+    return handler_out + "\t" + "\t".join(levels_out)
 
 
 def report_out(final_result: Dict[str, Dict[str, int]]) -> str:
@@ -147,7 +148,7 @@ def report_out(final_result: Dict[str, Dict[str, int]]) -> str:
         str: возвращает строку вывода
     """
     handler_sorted = sorted(final_result.keys())
-    header = "HANDLER".ljust(25) + "\t\t".join(level.ljust(8) for level in LOG_LEVELS)
+    header = "HANDLER".ljust(25) + "\t" + "\t".join(level.ljust(8) for level in LOG_LEVELS)
     lines = [header]
     
     all_requests = 0
@@ -158,20 +159,20 @@ def report_out(final_result: Dict[str, Dict[str, int]]) -> str:
         lines.append(format_out(handler, levels))
         
         for level in LOG_LEVELS:
-            k = levels.get(level, 0)
+            k = levels[level]
             request_by_level[level] += k
             all_requests += k
             
-    all_req_line = "TOTAL".ljust(25) + "\t\t".join(
+    all_req_line = "".ljust(25) + "\t" + "\t".join(
         str(request_by_level[level]).ljust(8) for level in LOG_LEVELS
     )
     lines.append(all_req_line)
     
-    return "\n".join([
+    return ("\n".join([
         f"Total requests: {all_requests}",
         "",
         *lines
-    ])
+    ]))
     
     
 def validate_files(file_paths: List[str]) -> None:
@@ -181,7 +182,7 @@ def validate_files(file_paths: List[str]) -> None:
             raise FileNotFoundError(f"file {file_path} not found") 
         
         
-async def async_main():
+def async_main():
     parser = argparse.ArgumentParser(
         description="Processing django log files and creating a report."
     )   
@@ -205,19 +206,16 @@ async def async_main():
         print(f"Error: {e}")
         return 
     
-    if len(args.log_files) == 1:
-        data_list_result = await parse_log_file
-    else:
-        data_list = await parse_log_files
-        data_list_result = merge_data(data_list)
+    data_list = parse_log_files(args.log_files)
+    merged_data_list = merge_data(data_list)
         
-    if args.report == "handlers":
-        report = report_out(data_list_result)
-        print(report)
+    if args.report == "handlers": 
+        report = report_out(merged_data_list)
+    print(report)
         
         
 def main():
-    asyncio.run(async_main())
+    async_main()
     
 
 if __name__ == "__main__":
