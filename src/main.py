@@ -1,7 +1,9 @@
 import argparse
+import asyncio
 import os
 import re
-from typing import Dict, List, Tuple, Optional, Iterable
+from typing import Dict, List, Tuple, Optional, AsyncIterable
+
 
 
 class LogParser:
@@ -36,12 +38,12 @@ class LogParser:
         return (level.group() if level else None), None
 
 
-class LogFileReader:
-    """Класс для чтения и обработки файлов логов"""
+class AsyncLogFileReader:
+    """Асинхронный класс для чтения и обработки файлов логов"""
     def __init__(self, parser: LogParser):
         self.parser = parser
 
-    def read_file_lines(self, file_path: str) -> Iterable[str]:
+    async def read_file_lines(self, file_path: str) -> AsyncIterable[str]:
         """
         Функция асинхронно и и построчно читает файл, доступ 
         к которому происходит через file_path
@@ -52,11 +54,11 @@ class LogFileReader:
         Returns:
             AsyncIterable[str]: Возвращает корутину после обработки файла
         """
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, mode='r', encoding='utf-8') as f:
             for line in f:
                 yield line
 
-    def parse_log_file(self, file_path: str) -> Dict[str, Dict[str, int]]:
+    async def parse_log_file(self, file_path: str) -> Dict[str, Dict[str, int]]:
         """
         Функция асинхронно обрабатывает файл логов и возвращает
         полученную статистику
@@ -71,7 +73,7 @@ class LogFileReader:
         data = {}
         cache = None
 
-        for line in self.read_file_lines(file_path):
+        async for line in self.read_file_lines(file_path):
             level, handler = self.parser.parse_log_line(line)
             
             if handler and handler not in data:
@@ -177,16 +179,16 @@ class ReportGenerator:
         ])
 
 
-class LogAnalyzer:
-    """Основной класс для анализа логов"""
+class AsyncLogAnalyzer:
+    """Асинхронный класс для анализа логов"""
     def __init__(self, config: Dict):
         self.config = config
         self.parser = LogParser(config['LOG_PATTERN'], config['HANDLER_PATTERN'], config['LOG_LEVELS'])
-        self.reader = LogFileReader(self.parser)
+        self.reader = AsyncLogFileReader(self.parser)
         self.merger = LogDataMerger(config['LOG_LEVELS'])
         self.reporter = ReportGenerator(config['LOG_LEVELS'])
 
-    def validate_files(self, file_paths: List[str]) -> None:
+    async def validate_files(self, file_paths: List[str]) -> None:
         """Функция для проверки существования файлов
 
         Args:
@@ -199,22 +201,24 @@ class LogAnalyzer:
             if not os.path.isfile(file_path):
                 raise FileNotFoundError(f"File {file_path} not found")
 
-    def analyze(self, file_paths: List[str], report_type: str) -> str:
-        """Основной метод для анализа логов
+    async def analyze(self, file_paths: List[str], report_type: str) -> str:
+        """Асинхронный основной метод для анализа логов
 
         Args:
-            file_paths (List[str]): список путей к файлам
-            report_type (str): название отчета, который нужно реализовать
+            file_paths (List[str]): пути к файлам для анализа
+            report_type (str): название отчета по логам
 
         Raises:
-            ValueError: вызывается, когда данные не подходят после проверки
+            ValueError: возникает при неправильном указании названия
 
         Returns:
-            str: возвращает строку для вывода в консоль
+            str: возвращает саму строку для вывода информации
         """
-        self.validate_files(file_paths)
+        await self.validate_files(file_paths)
         
-        data_list = [self.reader.parse_log_file(file_path) for file_path in file_paths]
+        tasks = [self.reader.parse_log_file(file_path) for file_path in file_paths]
+        data_list = await asyncio.gather(*tasks)
+        
         merged_data = self.merger.merge(data_list)
         
         if report_type == "handlers":
@@ -223,7 +227,7 @@ class LogAnalyzer:
         raise ValueError(f"Unknown report type: {report_type}")
 
 
-def main():
+async def async_main():
     from config import LOG_PATTERN, HANDLER_PATTERN, LOG_LEVELS
     
     config = {
@@ -232,30 +236,34 @@ def main():
         'LOG_LEVELS': LOG_LEVELS
     }
     
-    parser = argparse.ArgumentParser(description="Process Django log files and generate reports.")
-    parser.add_argument("log_files", nargs="+", help="Paths to log files")
-    parser.add_argument("--report", choices=["handlers"], required=True, help="Type of report")
+    parser = argparse.ArgumentParser(
+        description="Process Django log files and generate reports."
+    )
+    parser.add_argument(
+        "log_files", 
+        nargs="+", 
+        help="Paths to log files"
+    )
+    parser.add_argument(
+        "--report", 
+        choices=["handlers"], 
+        required=True, 
+        help="Type of report"
+    )
     
     args = parser.parse_args()
     
     try:
-        analyzer = LogAnalyzer(config)
-        report = analyzer.analyze(args.log_files, args.report)
+        analyzer = AsyncLogAnalyzer(config)
+        report = await analyzer.analyze(args.log_files, args.report)
         print(report)
     except Exception as e:
         print(f"Error: {e}")
 
 
+def main():
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
     main()
-    
-
-
-
-
-    
-        
-
-
-            
-            
