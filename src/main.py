@@ -180,10 +180,10 @@ class AsyncLogAnalyzer:
     """Асинхронный класс для анализа логов"""
     def __init__(self, config: Dict):
         self.config = config
-        self.parser = LogParser(config['LOG_PATTERN'], config['HANDLER_PATTERN'], config['LOG_LEVELS'])
+        self.parser = LogParser(config['log_pattern'], config['handler_pattern'], config['log_levels'])
         self.reader = AsyncLogFileReader(self.parser)
-        self.merger = LogDataMerger(config['LOG_LEVELS'])
-        self.reporter = ReportGenerator(config['LOG_LEVELS'])
+        self.merger = LogDataMerger(config['log_levels'])
+        self.reporter = ReportGenerator(config['log_levels'])
 
     async def validate_files(self, file_paths: List[str]) -> None:
         """Функция для проверки существования файлов
@@ -228,9 +228,9 @@ async def async_main():
     from config import LOG_PATTERN, HANDLER_PATTERN, LOG_LEVELS
     
     config = {
-        'LOG_PATTERN': LOG_PATTERN,
-        'HANDLER_PATTERN': HANDLER_PATTERN,
-        'LOG_LEVELS': LOG_LEVELS
+        'log_pattern': LOG_PATTERN,
+        'handler_pattern': HANDLER_PATTERN,
+        'log_levels': LOG_LEVELS
     }
     
     parser = argparse.ArgumentParser(
